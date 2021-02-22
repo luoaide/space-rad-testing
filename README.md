@@ -2,8 +2,7 @@
 
 This repository is part of research project at the United States Military Academy sponsored by the PaNE Department. This project encompasses testing consumer off-the-shelf hardware (COTS Hardware) for durability in radiation environments. The goal of this research is to enable the use of cheaper, higher-performing CPUs such as the Raspberry Pi 3B+ and Raspberry Pi Compute Module in low-earth orbit satellites.
 
-### Types of Test
-There are two types of test:   
+### Terminology 
 TID: Total Ionizing Dose    
 SEU: Singal Event Upset
 

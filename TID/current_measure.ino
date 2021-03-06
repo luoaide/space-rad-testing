@@ -2,19 +2,11 @@
 #include <SPI.h>
 #include <Ethernet.h>
 
-//mac address: fill with the proper address
-byte mac_addr[] = {0xE8, 0x2A, 0xEA, 0x4B, 0x1F, 0xC3};
-
-//the ip address of the Controllino
-IPaddress my_ip(192, 168, 6, 1);
-
-EthernetServer server(80); //80 is the port number on which Controllino will listen. We're making a webserver
-
-Ethernet.begin(mac_addr, my_ip);
-
+#define NUM_DEV 8
 
 // Constants
-const int SENSOR_PIN = A0; // Input pin for measuring Vout
+const int SENSOR_PINS = {A0, A0, A0, A0, A0, A0, A0, A0}; // Input pin for measuring Vout
+
 const int RS = 10; // Shunt resistor value (in ohms)
 const int VOLTAGE_REF = 5; // Reference voltage for analog read
 
@@ -29,72 +21,81 @@ void setup() {
 
 void loop() {
   // Read a value from the INA169 board
-  sensorValue = analogRead(SENSOR_PIN);
+  int sensorValues[8];
+
+  for(int i = 0; i<NUM_DEV; i++){
+    sensorValues[i] = analogRead(SENSOR_PINS[i]);
+  }
 
   // Remap the ADC value into a voltage number (5V reference)
-  sensorValue = (sensorValue * VOLTAGE_REF) / 1023;
+  for(int i = 0; i<NUM_DEV; i++){
+    sensorValues[i] = (sensorValues[i] * VOLTAGE_REF) / 1023;
+  }
 
   // Follow the equation given by the INA169 datasheet to
   // determine the current flowing through RS. Assume RL = 10k
   // Is = (Vout x 1k) / (RS x RL)
-  current = sensorValue / (10 * RS);
+  int currents[NUM_DEV]];
+  for(int i = 0; i<NUM_DEV; i++){
+    currents[i] = sensorValues[i] / (10 * RS);
+  }
 
   // Output value (in amps) to the serial monitor to 3 decimal
   // places
-  Serial.print(current, 3);
-  Serial.println(" A");
+  Serial.print("Start of Loop Output");
+  for(int i = 0; i<NUM_DEV; i){
+    Serial.printf("Current on Board %d:", i+1);
+    Serial.print(currents[i], 3);
+    Serial.println(" A");
+  }
 
   //update the webserver
-  listenForEthernetClients();
+  pushToServer(int* currents, NUM_DEV);
 
   // Delay program for a few milliseconds
   delay(500);
 }
-
-
-
 //The Arduino board communicates with the shield using the SPI bus. This is on digital pins 11, 12, and 13 on the Uno... https://www.arduino.cc/en/Reference/Ethernet
 
 //code adapted from: https://www.arduino.cc/en/Tutorial/LibraryExamples/BarometricPressureWebServer#code
 //ALSO: https://www.arduino.cc/en/Reference/Ethernet
 
-void listenForEthernetClients() {
-  // listen for incoming clients
-  EthernetClient conn_client = server.available();
+void pushToServer(int* currents, int len) {
+  //mac address: fill with the proper address
+  byte mac_addr[] = {0xE8, 0x2A, 0xEA, 0x4B, 0x1F, 0xC3};
 
-  if(conn_client) {
-    Serial.println("Got a client");
+  //the ip address of the Controllino or each Arduino
+  IPaddress my_ip(192, 168, 1, 254);
+  IPaddress server_ip(192, 168, 1, 1);
 
-    // an http request ends with a blank line
-    bool currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        // if you've gotten to the end of the line (received a newline
-        // character) and the line is blank, the http request has ended,
-        // so you can send a reply
-        if (c == '\n' && currentLineIsBlank) {
-          // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println();
-          // print the current readings, in HTML format:
-          client.print("Temperature: ");
-          client.print(temperature);
-          break;
-        }
-        if (c == '\n') {
-          // you're starting a new line
-          currentLineIsBlank = true;
-        } else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    // give the web browser time to receive the data
-    delay(1);
-    // close the connection:
-    client.stop();
+  EthernetServer client;
+
+  Ethernet.begin(mac_addr, my_ip);
+
+  client.connect(server_ip, 65432);
+
+  delay(10);
+
+
+  for(int i = 0; i<NUM_DEV; i){
+    //FORMAT:  DEVICE_ID TIME_STAMP CURRENT READING
+    int deviceID = "deviceNUM" + str(i);
+    int timeStamp =
+    int currentReading =
+    client.print(devidID);
+    client.print(" ");
+    client.print(timeStamp);
+    client.print(" ");
+    client.print(currents[i], 3);
   }
+
+  client.println("DATA TO SEND");
+  /*How to format DATA
+    SETUP: send some coordination info to sync the client with the server.
+    DEVICE_ID TIME_STAMP CURRENT READING
+  */
+
+  delay(10);
+
+  client.stop();
 }

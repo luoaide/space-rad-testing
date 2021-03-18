@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+
 # SOCKET PROGRAM Example from: https://realpython.com/python-sockets/
 # PLOTTING AND SERIAL INPUT CODE FROM: https://thepoorengineer.com/en/arduino-python-plot/#arduino
 
+import selectors
 import socket
 from threading import Thread
+
 import time
 import collections
 import matplotlib.pyplot as pyplot
@@ -11,35 +15,37 @@ import struct
 import pandas as pd
 
 
-
-class serialPlot:
+class serverData:
     def __init__(self, serverIP, portNum, plotLength, numDev):
         self.server_ip = serverIP
         self.port = portNum
         self.plotMaxLength = plotLength
         self.numDevices = numDev
         self.rawData = []
-        self.data = collections.deque([0] * plotLength, maxlen=plotLength)
+        self.data = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+
+        self.thread = None
+        self.clientThreads = list()
 
         self.isRun = True
         self.isReceiving = False
-        self.thread = None
         self.plotTimer = 0
         self.previousTimer = 0
         self.csvData = []
 
-        print("Trying to start server at: "" + str(server_ip))
+        print("Trying to start server at: " + str(self.server_ip))
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.bind( (serverIP, portNum) ) #associates the socket object (above) with network address and port number
+            self.sock.bind( (self.server_ip, self.port) ) #associates the socket object (above) with network address and port number
             self.sock.listen() #makes this socket a "listening" socket waiting for connections
-            print("Server running at " + str(server_ip))
+            #self.sock.setBlocking(false)
+            print("Server running at " + str(self.server_ip))
         except:
-            print("Failed to start server at: " + str(server_ip))
+            print("Failed to start server at: " + str(self.server_ip))
 
-    def readSerialStart(self):
+    def readClientDataStart(self):
         if self.thread == None:
-            self.thread = Thread(target = self.backgroundThread)
+            self.thread = Thread(target=self.backgroundThread)
             self.thread.start()
 
             # Block till we start receiving values
@@ -47,61 +53,83 @@ class serialPlot:
                 time.sleep(0.1)
 
 
-#I don't understand call to getSerialData
-    def getSerialData(self, frame, lines, lineValueText, lineLabel, timeText):
-        #FIX THIS METHOD!!!
+    def getData(self, frame, lines, lineValueText, lineLabel, timeText):
+        #getData is called by the plotting function in order to retreive the stored information.
         currentTimer = time.perf_counter()
         self.plotTimer = int((currentTimer - self.previousTimer) * 1000)     # the first reading will be erroneous
         self.previousTimer = currentTimer
+
         timeText.set_text('Plot Interval = ' + str(self.plotTimer) + 'ms')
 
-        value,  = struct.unpack('f', self.rawData)    # use 'h' for a 2 byte integer
+        #Incoming Data Stored in RawData as [DEVICE_ID, TIME_STAMP, CURRENT READING]
+        #? does the newest data go to the end or beginning of raw Data... that's a design choice
+        if len(self.rawData) > 0 and len(self.rawData[-1]) > 0:
+            devID = self.rawData[-1][0] #get the latest device ID
+            timeStamp = self.rawData[-1][1]
+            value = self.rawData[-1][2] # get the latest current measurment from self.rawData and put it on the queue (domain of plot)
 
-        self.data.append(value)    # we get the latest data point and append it to our array
-        lines.set_data(range(self.plotMaxLength), self.data)
-        lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
-        # self.csvData.append(self.data[-1])
+            self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
+            lines.set_data(range(0, self.plotMaxLength), self.data)
+            lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
+            self.csvData.append(self.data[-1])
+        else:
+            value = 0
+            self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
+            lines.set_data(range(self.plotMaxLength), self.data)
+            lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
+            self.csvData.append(self.data[-1])
 
     def backgroundThread(self):    # retrieve data
         time.sleep(1.0)  # give some buffer time for retrieving data
-        client_sock, client_ip = self.sock.accept()
-        while (self.isRun):
-            data = client_sock.recv(1024)
+        while self.isRun:
+            client_sock, client_ip = self.sock.accept()
+            thrd = Thread(target=useSocket, args=(client_sock, client_ip, ), daemon=True)
+            self.clientThreads.append(thrd)
+            thrd.start()
+            print('accepted connection from ', client_ip)
+
+    def useSocket(self, client, ip):
+        while self.isRun:
+            data = client.recv(1024)
             if not data:
-                break
-            client_sock.sendall("RECEIVED " + str(numBytes))
+                print('closing connection to ', ip)
+                client.close()
+
+            decoded_data = data.decode()
+            #client_sock.sendall("RECEIVED".encode())
+
             #need DEVICE_ID TIME_STAMP CURRENT READING
-            data = data.split(" ")
-            deviceID = data[0]
-            timeStamp = data[1]
-            currentReading = data[2]
+            decoded_data_split = decoded_data.split(" ")
+            deviceID = decoded_data_split[0]
+            timeStamp = decoded_data_split[1]
+            currentReading = decoded_data_split[2]
 
-            self.rawData += [deviceID, timeStamp, currentReading]
+            self.rawData.append([deviceID, timeStamp, currentReading])
             self.isReceiving = True
-
-        #once isRun is False, then close the proxy socket.
-        client_sock.close()
 
     def close(self):
         self.isRun = False
+        time.sleep(1.0) #this should ensure that client_sock has time to close before we join the thread.
         #Will client_sock successfully close?
+        for thrd in self.clientThreads:
+            thrd.join()
         self.thread.join()
         self.sock.close()
         print('Disconnected...')
-        df = pd.DataFrame(self.csvData)
-        df.to_csv('/home/Aiden.Roberts/Desktop/data.csv') #check file path
+        #df = pd.DataFrame(self.csvData)
+        #df.to_csv('C:\Users\Aiden.Roberts\Desktop\spaceraddata\data.csv') #check file path
 
 
 def main():
     #It will be a job of each Arduino to push data to this server.
-    serverIP = "192.168.1.1"
+    serverIP = "169.254.138.192"
     portNum = 65432
     numDev = 1
     #Incoming Data Format: (DEVICE_ID, TIME_STAMP, CURRENT READING)
-    maxPlotLength = 100
+    maxPlotLength = 99
 
-    s = serverData(serverIP, portName, plotLength, numDev)      # initializes all required variables
-    s.readData()                                                # starts background thread
+    s = serverData(serverIP, portNum, maxPlotLength, numDev)      # initializes all required variables
+    s.readClientDataStart()                                     # starts background thread
 
     # plotting starts below
     pltInterval = 50    # Period at which the plot animation updates [ms]
@@ -118,8 +146,8 @@ def main():
     lineLabel = 'Current Value'
     timeText = axes.text(0.50, 0.95, '', transform=axes.transAxes)
     lines = axes.plot([], [], label=lineLabel)[0]
-    lineValueText = ax.text(0.50, 0.90, '', transform=axes.transAxes)
-    anim = animation.FuncAnimation(plot, s.getSerialData, fargs=(lines, lineValueText, lineLabel, timeText), interval=pltInterval)    # fargs has to be a tuple
+    lineValueText = axes.text(0.50, 0.90, '', transform=axes.transAxes)
+    anim = animation.FuncAnimation(plot, s.getData, fargs=(lines, lineValueText, lineLabel, timeText), interval=pltInterval)    # fargs has to be a tuple
 
     pyplot.legend(loc="upper left")
     pyplot.show()

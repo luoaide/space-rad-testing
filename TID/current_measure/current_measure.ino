@@ -1,7 +1,7 @@
 //SetupControllino MAXI as a network server: https://forum.controllino.biz/viewtopic.php?t=2131
 #include <SPI.h>
 #include <Ethernet.h>
-#include <Time.h>
+#include <time.h>
 
 #define NUM_DEV 1 //change the number of devices configured to output current
 #define RS 10 // Shunt resistor value (in ohms)
@@ -29,6 +29,7 @@ void setup() {
 }
 
 void loop() {
+  Serial.print("starting\n");
   if(!client.connected()) {
     establishServerConn();
   }
@@ -77,7 +78,6 @@ void readSensors() {
   }
 
   // Output value (in amps) to the serial monitor to 3 decimal
-  Serial.print("Start of Loop Output");
   for(int i = 0; i<NUM_DEV; i++){
     Serial.print("Current on Board ");
     Serial.print(i+1);
@@ -95,8 +95,8 @@ void pushToServer() {
     int deviceID = i;
     int timeStamp = time(NULL) - startTime;
     float currentReading = sensorValues[i];
-    char output[64];
-    sprintf(output, "%d %d %f", deviceID, timeStamp, sensorValues[i]);
+    //https://www.arduino.cc/reference/en/language/variables/data-types/stringobject/
+    String output = String(deviceID) + String(" ") + String(timeStamp) + String(" ") + String(sensorValues[i], 3);
     client.print(output);
   }
   free(sensorValues); //free the malloced memory after this iteration of the loop.

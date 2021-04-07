@@ -21,7 +21,7 @@ class serverData:
         self.plotMaxLength = plotLength
         self.numDevices = numDev
         self.rawData = []
-        self.data = collections.deque(0 * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.data = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
 
         self.thread = None
 
@@ -65,14 +65,12 @@ class serverData:
             timeStamp = self.rawData[-1][1] #the offset from epoch beginning when this current measurement was taken
             value = self.rawData[-1][2] # get the latest current measurment from self.rawData and put it on the queue (domain of plot)
 
-            self.data.pop()
             self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
             lines.set_data(range(0, self.plotMaxLength), self.data)
             lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
             self.csvData.append(self.rawData[-1])
         else:
             value = 0
-            self.data.pop()
             self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
             lines.set_data(range(self.plotMaxLength), self.data)
             lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
@@ -89,13 +87,14 @@ class serverData:
                 client.close()
 
             decoded_data = data.decode()
+            print(decoded_data)
             #client_sock.sendall("RECEIVED".encode())
 
             #need DEVICE_ID TIME_STAMP CURRENT READING
             decoded_data_split = decoded_data.split(" ")
             deviceID = decoded_data_split[0]
             timeStamp = decoded_data_split[1]
-            currentReading = decoded_data_split[2]
+            currentReading = float(decoded_data_split[2])
 
             self.rawData.append([deviceID, timeStamp, currentReading])
             self.isReceiving = True

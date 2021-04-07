@@ -3,7 +3,6 @@
 # SOCKET PROGRAM Example from: https://realpython.com/python-sockets/
 # PLOTTING AND SERIAL INPUT CODE FROM: https://thepoorengineer.com/en/arduino-python-plot/#arduino
 
-import selectors
 import socket
 from threading import Thread
 
@@ -22,10 +21,9 @@ class serverData:
         self.plotMaxLength = plotLength
         self.numDevices = numDev
         self.rawData = []
-        self.data = collections.deque([0] * self.plotMaxLength, maxlen=self.plotMaxLength)
+        self.data = collections.deque(0 * self.plotMaxLength, maxlen=self.plotMaxLength)
 
         self.thread = None
-        self.clientThreads = list()
 
         self.isRun = True
         self.isReceiving = False
@@ -38,7 +36,6 @@ class serverData:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.bind( (self.server_ip, self.port) ) #associates the socket object (above) with network address and port number
             self.sock.listen() #makes this socket a "listening" socket waiting for connections
-            #self.sock.setBlocking(false)
             print("Server running at " + str(self.server_ip))
         except:
             print("Failed to start server at: " + str(self.server_ip))
@@ -48,7 +45,7 @@ class serverData:
             self.thread = Thread(target=self.backgroundThread)
             self.thread.start()
 
-            # Block till we start receiving values
+            # Block until we start receiving values
             while self.isReceiving != True:
                 time.sleep(0.1)
 
@@ -62,35 +59,31 @@ class serverData:
         timeText.set_text('Plot Interval = ' + str(self.plotTimer) + 'ms')
 
         #Incoming Data Stored in RawData as [DEVICE_ID, TIME_STAMP, CURRENT READING]
-        #? does the newest data go to the end or beginning of raw Data... that's a design choice
-        if len(self.rawData) > 0 and len(self.rawData[-1]) > 0:
+        #Newest data goes to the end of raw Data bcause list appending takes O(1)
+        if len(self.rawData) > 0:
             devID = self.rawData[-1][0] #get the latest device ID
-            timeStamp = self.rawData[-1][1]
+            timeStamp = self.rawData[-1][1] #the offset from epoch beginning when this current measurement was taken
             value = self.rawData[-1][2] # get the latest current measurment from self.rawData and put it on the queue (domain of plot)
 
+            self.data.pop()
             self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
             lines.set_data(range(0, self.plotMaxLength), self.data)
             lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
-            self.csvData.append(self.data[-1])
+            self.csvData.append(self.rawData[-1])
         else:
             value = 0
+            self.data.pop()
             self.data.append(value)    # we get the latest data point and append it to our array (the domain of the plot)
             lines.set_data(range(self.plotMaxLength), self.data)
             lineValueText.set_text('[' + lineLabel + '] = ' + str(value))
-            self.csvData.append(self.data[-1])
+            self.csvData.append([0, 0, 0])
 
     def backgroundThread(self):    # retrieve data
         time.sleep(1.0)  # give some buffer time for retrieving data
-        while self.isRun:
-            client_sock, client_ip = self.sock.accept()
-            thrd = Thread(target=useSocket, args=(client_sock, client_ip, ), daemon=True)
-            self.clientThreads.append(thrd)
-            thrd.start()
-            print('accepted connection from ', client_ip)
 
-    def useSocket(self, client, ip):
+        client_sock, client_ip = self.sock.accept()
         while self.isRun:
-            data = client.recv(1024)
+            data = client_sock.recv(1024)
             if not data:
                 print('closing connection to ', ip)
                 client.close()
@@ -107,12 +100,11 @@ class serverData:
             self.rawData.append([deviceID, timeStamp, currentReading])
             self.isReceiving = True
 
+        client_sock.close()
+
     def close(self):
         self.isRun = False
         time.sleep(1.0) #this should ensure that client_sock has time to close before we join the thread.
-        #Will client_sock successfully close?
-        for thrd in self.clientThreads:
-            thrd.join()
         self.thread.join()
         self.sock.close()
         print('Disconnected...')
@@ -125,7 +117,7 @@ def main():
     serverIP = "169.254.138.192"
     portNum = 65432
     numDev = 1
-    #Incoming Data Format: (DEVICE_ID, TIME_STAMP, CURRENT READING)
+    #Incoming Data Format: DEVICE_ID TIME_STAMP CURRENT_READING
     maxPlotLength = 99
 
     s = serverData(serverIP, portNum, maxPlotLength, numDev)      # initializes all required variables

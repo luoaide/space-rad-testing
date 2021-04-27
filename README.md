@@ -8,6 +8,11 @@ SEU: Singal Event Upset
 
 # TID Test Structure
 
+### Raspberry Pi image
+The raspberry Pi needs to:
+1. grab a static ip address
+2. run diagnostic script on boot and send output over network
+
 ### current_measurment.ino
 This script runs on an Arduino Uno and reads in current measurements from the test devices. It then sends the output serially to a python script on a listening host.
 

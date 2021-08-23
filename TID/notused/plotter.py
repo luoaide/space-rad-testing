@@ -113,7 +113,7 @@ class serverData:
 
 def main():
     #It will be a job of each Arduino to push data to this server.
-    serverIP = "169.254.138.192"
+    serverIP = "192.168.1.1"
     portNum = 65432
     numDev = 1
     #Incoming Data Format: DEVICE_ID TIME_STAMP CURRENT_READING

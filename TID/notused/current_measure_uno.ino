@@ -17,8 +17,8 @@ float *sensorValues;
 time_t startTime;
 
 byte mac_addr[] = {0xA8, 0x61, 0x0A, 0xAE, 0x75, 0xEF};
-IPAddress my_ip(169, 254, 138, 1); //the ip address of the Controllino or each Arduino... does this set it?
-IPAddress server_ip(169, 254, 138, 192); //the ip address of the server (plotter.py script)
+IPAddress my_ip(192, 168, 1, 253); //the ip address of the Controllino or each Arduino... does this set it?
+IPAddress server_ip(192, 168, 1, 1); //the ip address of the server (plotter.py script)
 
 void setup() {
   // Initialize serial monitor
@@ -46,12 +46,6 @@ void establishServerConn() {
   //Open up server connection in setup so that loop() can repeatedly use same connection
   Ethernet.begin(mac_addr, my_ip);
   int conn_status = client.connect(server_ip, PORT);
-  //.connect Returns an int (1,-1,-2,-3,-4) indicating connection status :
-  // SUCCESS 1
-  // TIMED_OUT -1
-  // INVALID_SERVER -2
-  // TRUNCATED -3
-  // INVALID_RESPONSE -4
 }
 
 void readSensors() {

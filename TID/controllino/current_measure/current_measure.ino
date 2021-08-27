@@ -38,13 +38,12 @@ void setup() {
 
 void loop() {
   Serial.print("Query Time: ");
-  Serial.println("%d:%d:%d", Controllino_GetHour(), Controllino_GetMinute(), Controllino_GetSecond());
+  //Serial.println("%c:%c:%c", Controllino_GetHour(), Controllino_GetMinute(), Controllino_GetSecond());
 
   if(!client.connected()) {
     establishServerConn();
   } else {
     readSensors(); //read input and calculate currents
-    pushToServer(); //send the calculated current values to the server through a helper function
   }
 
   // Set Interval for Current Reads to 100ms
@@ -113,13 +112,14 @@ void readSensors() {
   //Resource Used: https://www.arduino.cc/en/Reference/Ethernet
   //https://www.arduino.cc/reference/en/language/variables/data-types/stringobject/
 
-  String timeStamp = String(Controllino_GetHour()) + String(":") + String(Controllino_GetMinute()) + String(":") + String(Controllino_GetSecond());
+  //String timeStamp = String(Controllino_GetHour()) + String(":") + String(Controllino_GetMinute()) + String(":") + String(Controllino_GetSecond());
+  int timeStamp = 1;
 
-  String A0_out = String("Board_1_A0") + String(" ") + timeStamp + String(" ") + String(A0Current, 3);
-  String A1_out = String("Board_2_A1") + String(" ") + timeStamp + String(" ") + String(A1Current, 3);
-  String A2_out = String("Board_3_A2") + String(" ") + timeStamp + String(" ") + String(A2Current, 3);
-  String A3_out = String("Board_4_A3") + String(" ") + timeStamp + String(" ") + String(A3Current, 3);
-  String A4_out = String("Board_5_A4") + String(" ") + timeStamp + String(" ") + String(A4Current, 3);
+  String A0_out = String("Board_1_A0") + String(" ") + String(timeStamp) + String(" ") + String(A0Current, 3);
+  String A1_out = String("Board_2_A1") + String(" ") + String(timeStamp) + String(" ") + String(A1Current, 3);
+  String A2_out = String("Board_3_A2") + String(" ") + String(timeStamp) + String(" ") + String(A2Current, 3);
+  String A3_out = String("Board_4_A3") + String(" ") + String(timeStamp) + String(" ") + String(A3Current, 3);
+  String A4_out = String("Board_5_A4") + String(" ") + String(timeStamp) + String(" ") + String(A4Current, 3);
 
   client.print(A0_out);
   client.print(A1_out);
